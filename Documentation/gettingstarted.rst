@@ -9,6 +9,130 @@ your laptop.  It is designed to take 15-30 minutes.
 
 If you haven't read the :ref:`intro` yet, we'd encourage you to do that first.
 
+Getting Started using Kubernetes
+--------------------------------
+
+The best way to get help if you get stuck is to ask a question on the `Cilium
+Slack channel <https://cilium.herokuapp.com>`_ .  With Cilium contributors
+across the globe, there is almost always someone available to help.
+
+Step 0: Install minikube & kubectl
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This step is only required if you don't have a functional Kubernetes cluster at
+your disposal already.
+
+Install ``kubectl`` as described in the `Kubernetes installation guide
+<https://kubernetes.io/docs/tasks/kubectl/install/>`_.
+
+Install ``minikube`` as described in the guide `Running Kubernetes Locally via
+Minikube <https://kubernetes.io/docs/getting-started-guides/minikube/#installation>`_.
+
+::
+
+    $ minikube start --network-plugin=cni --iso-url https://raw.githubusercontent.com/cilium/minikube-iso/master/minikube.iso
+
+
+.. note:: All the required changes have already been merged into the minikube
+          repository and the next release of minikube will no longer require to
+          provide the ``--iso-url`` parameter.
+
+
+You can now check the status of your Kubernetes cluster:
+
+::
+
+    $ kubectl get cs
+
+
+Step 1: Deploy Cilium
+^^^^^^^^^^^^^^^^^^^^^
+
+Deploy Cilium in the ``kube-system`` namespace:
+
+::
+
+    $ kubectl create -f https://raw.githubusercontent.com/cilium/cilium/k8s-doc/examples/minikube/cilium-ds.yaml
+
+While ``kubectl`` deploys the pods, you can monitor the progress and you will
+notice the number of ready pods going from 0 to the desired number which will
+equals to the number of nodes in the cluster.
+
+::
+
+    $ kubectl get ds --namespace kube-system
+    NAME      DESIRED   CURRENT   READY     NODE-SELECTOR   AGE
+    cilium    1         1         0         <none>          3s
+
+    $ kubectl describe pods cilium --namespace kube-system
+    [...]
+
+
+Step 2: Deploy the guestbook app
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Deploy the Kubernetes guestbook example app usign the all-in-one yaml file:
+
+::
+
+    $ kubectl create -f https://raw.githubusercontent.com/kubernetes/kubernetes/master/examples/guestbook/all-in-one/guestbook-all-in-one.yaml
+
+This will deploy several pods in the ``default`` namespace:
+
+::
+
+    $ kubectl get pods
+    NAME                            READY     STATUS              RESTARTS   AGE
+    frontend-3823415956-2j3t2       0/1       ContainerCreating   0          1m
+    frontend-3823415956-4r318       0/1       ContainerCreating   0          1m
+    frontend-3823415956-6st8m       0/1       ContainerCreating   0          1m
+    redis-master-1068406935-jvx2x   1/1       Running             0          1m
+    redis-slave-2005841000-m3995    0/1       ContainerCreating   0          1m
+    redis-slave-2005841000-sk5xk    0/1       ContainerCreating   0          1m
+
+
+Step 3: Check status of Cilium
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Log into the minikube ssh using the following command:
+
+
+::
+
+    $ minikube ssh
+
+Download the ``cilium`` client and make the binary executable.
+
+::
+
+    $ curl -sSL https://github.com/cilium/cilium/releases/download/v0.8.2/cilium-x86_64 -o cilium
+    $ chmod +x cilium
+    $ sudo mv cilium /usr/bin
+
+You can now use the ``cilium`` CLI to interact with the ``cilium-agent``:
+
+::
+
+    $ cilium endpoint list
+    ENDPOINT   IDENTITY   LABELS (source:key[=value])               IPv6                   IPv4            STATUS
+    11004      258        k8s:io.kubernetes.pod.namespace=default   f00d::a00:20f:0:2afc   10.15.54.125    ready
+                          k8s:app=guestbook
+    49508      258        k8s:app=guestbook                         f00d::a00:20f:0:c164   10.15.114.197   regenerating
+                          k8s:io.kubernetes.pod.namespace=default
+    33115      256        k8s:role=slave                            f00d::a00:20f:0:815b   10.15.220.6     regenerating
+                          k8s:io.kubernetes.pod.namespace=default
+                          k8s:app=redis
+    64189      257        k8s:app=redis                             f00d::a00:20f:0:fabd   10.15.152.27    regenerating
+                          k8s:io.kubernetes.pod.namespace=default
+                          k8s:role=master
+    38061      256        k8s:app=redis                             f00d::a00:20f:0:94ad   10.15.0.173     ready
+                          k8s:io.kubernetes.pod.namespace=default
+                          k8s:role=slave
+
+
+Getting Started using Vagrant
+-----------------------------
+
 The tutorial leverages Vagrant, and as such should run on any operating system
 supported by Vagrant, including Linux, MacOS X, and Windows. The VM running
 Docker + Cilium requires about 3 GB of RAM, so if your laptop has limited
@@ -25,7 +149,7 @@ Slack channel <https://cilium.herokuapp.com>`_ .  With Cilium contributors
 across the globe, there is almost always someone available to help.
 
 Step 0: Install Vagrant
------------------------
+^^^^^^^^^^^^^^^^^^^^^^^
 
 .. note::
 
@@ -37,7 +161,7 @@ If you don't already have Vagrant installed, follow the
 
 
 Step 1: Download the Cilium Source Code
----------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Download the latest Cilium `source code <https://github.com/cilium/cilium/archive/master.zip>`_
 and unzip the files.
@@ -50,7 +174,7 @@ repository:
     $ git clone https://github.com/cilium/cilium
 
 Step 2: Starting the Docker + Cilium VM
----------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Open a terminal and navigate into the top of the cilium source directory.
 
@@ -78,7 +202,7 @@ tutorial, as later steps will not work properly.   Instead, contact us on the
 `Cilium Slack channel <https://cilium.herokuapp.com>`_ .
 
 Step 3: Accessing the VM
-------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 After the script has successfully completed, you can log into the VM using
 ``vagrant ssh``:
@@ -95,7 +219,7 @@ directory.
 
 
 Step 4: Confirm that Cilium is Running
---------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The Cilium agent is now running as a system service and you can interact with
 it using the ``cilium`` CLI client. Check the status of the agent by running
@@ -113,7 +237,7 @@ The status indicates that all components are operational with the Kubernetes
 integration currently being disabled.
 
 Step 5: Create a Docker Network of Type Cilium
-----------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Cilium integrates with local container runtimes, which in the case of this demo
 means Docker. With Docker, native networking is handled via a component called
@@ -131,7 +255,7 @@ named 'cilium-net' for all containers:
 
 
 Step 6: Start an Example Service with Docker
---------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In this tutorial, we'll use a container running a simple HTTP server to
 represent a microservice which we will refer to as *Service1*.  As a result, we
@@ -153,7 +277,7 @@ containers which can be addressed by an individual IP address.
 
 
 Step 7: Apply an L3/L4 Policy With Cilium
---------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When using Cilium, endpoint IP addresses are irrelevant when defining security
 policies.  Instead, you can use the labels assigned to the VM to define
@@ -199,7 +323,7 @@ policy by running:
 
 
 Step 8: Test L3/L4 Policy
--------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can now launch additional containers represent other services attempting to
 access *Service1*. Any new container with label "id.service2" will be allowed
@@ -239,7 +363,7 @@ particular service are assigned an IP address in a particular range.
 
 
 Step 9:  Apply and Test an L7 Policy with Cilium
-------------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In the simple scenario above, it was sufficient to either give *Service2* /
 *Service3* full access to *Service1's* API or no access at all.   But to
@@ -327,7 +451,7 @@ Slack channel <https://cilium.herokuapp.com>`_ with any questions!
 
 
 Step 10: Clean-Up
------------------
+^^^^^^^^^^^^^^^^^
 
 When you are done with the setup and want to tear-down the Cilium + Docker VM,
 and destroy all local state (e.g., the VM disk image), open a terminal, navigate to
