@@ -16,55 +16,114 @@ package policy
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/cilium/cilium/common"
 	"github.com/cilium/cilium/pkg/labels"
+	"github.com/cilium/cilium/pkg/policy/api"
 )
 
-type PolicyRule interface {
-	// Resolve must resolve any internal label members to the full path
-	// assuming that the rule is attached to the specified node.
-	Resolve(node *Node) error
-
-	// SHA256Sum must return the SHA256 hash over the policy rule
-	SHA256Sum() (string, error)
-
-	// CoverageSHA256Sum must return the SHA256 hash over the coverage
-	// section of the policy rule
-	CoverageSHA256Sum() (string, error)
-
-	// IsMergeable must return true if a rule allows merging with other
-	// rules within a node. Certain rules are not additive and require
-	// strict ordering, such rules may never be merged in a node as
-	// merging may occur in undefined order.
-	IsMergeable() bool
+type rule struct {
+	api.Rule
 }
 
-// RuleBase is the base type for all other rules
-type RuleBase struct {
-	Coverage labels.LabelArray `json:"coverage,omitempty"`
+func (r *rule) String() string {
+	return fmt.Sprintf("%v", r.EndpointSelector)
 }
 
-// Resolve translates all relative names of the generic part of the rule
-// to absolute names. It also verifies that all label references are
-// within the scope rules of the node
-func (r *RuleBase) Resolve(node *Node) error {
-	log.Debugf("Resolving rule %+v\n", r)
+func (r *rule) validate() error {
+	if r == nil {
+		return fmt.Errorf("nil rule")
+	}
 
-	for _, l := range r.Coverage {
-		l.Resolve(node)
-
-		if node.IgnoreNameCoverage {
-			continue
-		}
-
-		if !strings.HasPrefix(l.AbsoluteKey(), node.Path()) &&
-			!(l.Source == common.ReservedLabelSource) {
-			return fmt.Errorf("label %s does not share prefix of node %s",
-				l.AbsoluteKey(), node.Path())
-		}
+	if len(r.EndpointSelector) == 0 {
+		return fmt.Errorf("empty EndpointSelector")
 	}
 
 	return nil
+}
+
+func mergeL4Port(r api.PortRule, p api.PortProtocol, proto string, resMap L4PolicyMap) int {
+	fmt := fmt.Sprintf("%s:%d", proto, p.Port)
+	if _, ok := resMap[fmt]; !ok {
+		resMap[fmt] = CreateL4Filter(r, p, proto)
+		return 1
+	}
+
+	return 0
+}
+
+func mergeL4(portRules []api.PortRule, resMap L4PolicyMap) int {
+	found := 0
+
+	for _, r := range portRules {
+		for _, p := range r.Ports {
+			if p.Protocol != "" {
+				found += mergeL4Port(r, p, p.Protocol, resMap)
+			} else {
+				found += mergeL4Port(r, p, "tcp", resMap)
+				found += mergeL4Port(r, p, "udp", resMap)
+			}
+		}
+	}
+
+	return found
+}
+
+func (r *rule) resolveL4Policy(ctx *SearchContext, result *L4Policy) *L4Policy {
+	if !ctx.TargetCoveredBy(r.EndpointSelector) {
+		return nil
+	}
+
+	found := 0
+
+	for _, r := range r.Ingress {
+		found += mergeL4(r.ToPorts, result.Ingress)
+	}
+
+	for _, r := range r.Egress {
+		found += mergeL4(r.ToPorts, result.Egress)
+	}
+
+	if found > 0 {
+		return result
+	}
+
+	return nil
+}
+
+func (r *rule) canReach(ctx *SearchContext) api.Decision {
+	if !ctx.TargetCoveredBy(r.EndpointSelector) {
+		return api.Undecided
+	}
+
+	for _, r := range r.Ingress {
+		for _, sel := range r.FromRequires {
+			ctx.PolicyTraceVerbose("Rule %s: requires labels %+v\n", r, sel)
+
+			// TODO: get rid of this cast
+			if !ctx.From.Contains(labels.LabelArray(sel)) {
+				ctx.PolicyTrace("  Required labels not found\n")
+				return api.Denied
+			}
+		}
+	}
+
+	// separate loop is needed as failure to meet FromRequires always takes
+	// precedence over FromEndpoints
+	for _, r := range r.Ingress {
+		for _, sel := range r.FromEndpoints {
+			ctx.PolicyTraceVerbose("Rule %s: allows labels %+v\n", r, sel)
+
+			// TODO: get rid of this cast
+			if ctx.From.Contains(labels.LabelArray(sel)) {
+				ctx.PolicyTrace("  Found all required labels\n")
+				return api.Allowed
+			}
+
+			ctx.PolicyTrace("  Required labels not found\n")
+		}
+	}
+
+	ctx.PolicyTraceVerbose("rule %s: no FromEndpoints\n", r)
+
+	return api.Undecided
 }

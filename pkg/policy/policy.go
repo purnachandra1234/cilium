@@ -30,57 +30,6 @@ var (
 	log = logging.MustGetLogger("cilium-policy")
 )
 
-// Privilege represents the privileges available to define for a policy node.
-type Privilege byte
-
-const (
-	ALLOW Privilege = iota
-	ALWAYS_ALLOW
-	REQUIRES
-	L4
-)
-
-var (
-	privEnc = map[Privilege]string{
-		ALLOW:        "allow",
-		ALWAYS_ALLOW: "always-allow",
-		REQUIRES:     "requires",
-		L4:           "l4",
-	}
-	privDec = map[string]Privilege{
-		"allow":        ALLOW,
-		"always-allow": ALWAYS_ALLOW,
-		"requires":     REQUIRES,
-		"l4":           L4,
-	}
-)
-
-func (p Privilege) String() string {
-	if v, exists := privEnc[p]; exists {
-		return v
-	}
-	return ""
-}
-
-func (p *Privilege) UnmarshalJSON(b []byte) error {
-	if p == nil {
-		p = new(Privilege)
-	}
-	if len(b) <= len(`""`) {
-		return fmt.Errorf("invalid privilege '%s'", string(b))
-	}
-	if v, exists := privDec[string(b[1:len(b)-1])]; exists {
-		*p = Privilege(v)
-		return nil
-	}
-
-	return fmt.Errorf("unknown '%s' privilege", string(b))
-}
-
-func (p Privilege) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`"%s"`, p)), nil
-}
-
 type Tracing int
 
 const (
