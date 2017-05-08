@@ -22,13 +22,11 @@ import (
 
 // policyGetCmd represents the policy_get command
 var policyGetCmd = &cobra.Command{
-	Use:    "get <policy-path>",
-	Short:  "Display policy node information",
-	PreRun: requirePath,
+	Use:   "get [<labels>]",
+	Short: "Display policy node information",
 	Run: func(cmd *cobra.Command, args []string) {
-		path := args[0]
-		if resp, err := client.PolicyGet(path); err != nil {
-			Fatalf("Cannot get policy %s: %s\n", path, err)
+		if resp, err := client.PolicyGet(); err != nil {
+			Fatalf("Cannot get policy: %s\n", err)
 		} else {
 			fmt.Printf("%s\n", resp)
 		}

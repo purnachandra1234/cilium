@@ -20,13 +20,11 @@ import (
 
 // policyDeleteCmd represents the policy_delete command
 var policyDeleteCmd = &cobra.Command{
-	Use:    "delete <policy-path>",
-	Short:  "Delete a policy tree node",
-	PreRun: requirePath,
+	Use:   "delete [<labels>]",
+	Short: "Delete policy rules",
 	Run: func(cmd *cobra.Command, args []string) {
-		path := args[0]
-		if err := client.PolicyDelete(path); err != nil {
-			Fatalf("Cannot delete policy %s: %s\n", path, err)
+		if err := client.PolicyDelete(); err != nil {
+			Fatalf("Cannot delete policy: %s\n", err)
 		}
 	},
 }

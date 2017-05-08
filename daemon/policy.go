@@ -194,7 +194,7 @@ func (d *Daemon) PolicyAdd(rules []*api.Rule) *apierror.APIError {
 	}
 
 	if err := d.policy.AddList(rules); err != nil {
-		return apierror.Error(PutPolicyPathFailureCode, err)
+		return apierror.Error(PutPolicyFailureCode, err)
 	}
 
 	log.Info("New policy imported, regenerating...")
@@ -212,58 +212,58 @@ func (d *Daemon) PolicyDelete(labels labels.LabelArray) *apierror.APIError {
 	log.Debugf("Policy Delete Request: %+v", labels)
 
 	//if cover256Sum != "" && len(cover256Sum) != policy.CoverageSHASize {
-	//	return apierror.New(DeletePolicyPathInvalidCode,
+	//	return apierror.New(DeleteInvalidCode,
 	//		"invalid length of hash, must be %d", policy.CoverageSHASize)
 	//}
 
 	if d.policy.DeleteByLabels(labels) == 0 {
-		return apierror.New(DeletePolicyPathNotFoundCode, "policy not found")
+		return apierror.New(DeletePolicyNotFoundCode, "policy not found")
 	}
 
 	d.TriggerPolicyUpdates([]policy.NumericIdentity{})
 	return nil
 }
 
-type deletePolicyPath struct {
+type deletePolicy struct {
 	daemon *Daemon
 }
 
-func NewDeletePolicyPathHandler(d *Daemon) DeletePolicyPathHandler {
-	return &deletePolicyPath{daemon: d}
+func NewDeletePolicyHandler(d *Daemon) DeletePolicyHandler {
+	return &deletePolicy{daemon: d}
 }
 
-func (h *deletePolicyPath) Handle(params DeletePolicyPathParams) middleware.Responder {
+func (h *deletePolicy) Handle(params DeletePolicyParams) middleware.Responder {
 	d := h.daemon
 	// FIXME
 	if err := d.PolicyDelete(labels.LabelArray{}); err != nil {
-		return apierror.Error(DeletePolicyPathFailureCode, err)
+		return apierror.Error(DeletePolicyFailureCode, err)
 	}
 
-	return NewDeletePolicyPathNoContent()
+	return NewDeletePolicyNoContent()
 }
 
-type putPolicyPath struct {
+type putPolicy struct {
 	daemon *Daemon
 }
 
-func NewPutPolicyPathHandler(d *Daemon) PutPolicyPathHandler {
-	return &putPolicyPath{daemon: d}
+func NewPutPolicyHandler(d *Daemon) PutPolicyHandler {
+	return &putPolicy{daemon: d}
 }
 
-func (h *putPolicyPath) Handle(params PutPolicyPathParams) middleware.Responder {
+func (h *putPolicy) Handle(params PutPolicyParams) middleware.Responder {
 	d := h.daemon
 
 	var rules []*api.Rule
 	if err := json.Unmarshal([]byte(*params.Policy), &rules); err != nil {
-		return NewPutPolicyPathInvalidPolicy()
+		return NewPutPolicyInvalidPolicy()
 	}
 
 	if err := d.PolicyAdd(rules); err != nil {
-		return apierror.Error(PutPolicyPathFailureCode, err)
+		return apierror.Error(PutPolicyFailureCode, err)
 	}
 
 	json := policy.JSONMarshalRules(rules)
-	return NewPutPolicyPathOK().WithPayload(models.PolicyTree(json))
+	return NewPutPolicyOK().WithPayload(models.PolicyTree(json))
 }
 
 type getPolicy struct {
@@ -274,21 +274,7 @@ func NewGetPolicyHandler(d *Daemon) GetPolicyHandler {
 	return &getPolicy{daemon: d}
 }
 
-// Returns the entire policy tree
 func (h *getPolicy) Handle(params GetPolicyParams) middleware.Responder {
-	d := h.daemon
-	return NewGetPolicyOK().WithPayload(models.PolicyTree(d.policy.GetJSON()))
-}
-
-type getPolicyPath struct {
-	daemon *Daemon
-}
-
-func NewGetPolicyPathHandler(d *Daemon) GetPolicyPathHandler {
-	return &getPolicyPath{daemon: d}
-}
-
-func (h *getPolicyPath) Handle(params GetPolicyPathParams) middleware.Responder {
 	d := h.daemon
 	d.policy.Mutex.RLock()
 	defer d.policy.Mutex.RUnlock()
@@ -296,11 +282,11 @@ func (h *getPolicyPath) Handle(params GetPolicyPathParams) middleware.Responder 
 	// FIXME
 	ruleList := d.policy.SearchRLocked(labels.LabelArray{})
 	if len(ruleList) == 0 {
-		return NewGetPolicyPathNotFound()
+		return NewGetPolicyNotFound()
 	}
 
 	json := policy.JSONMarshalRules(ruleList)
-	return NewGetPolicyPathOK().WithPayload(models.PolicyTree(json))
+	return NewGetPolicyOK().WithPayload(models.PolicyTree(json))
 }
 
 func (d *Daemon) PolicyInit() error {

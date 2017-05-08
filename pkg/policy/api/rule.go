@@ -54,7 +54,7 @@ type Rule struct {
 	// unique, multiple rules can have overlapping or identical labels.
 	//
 	// +optional
-	Labels labels.LabelArray `json:"group,omitempty"`
+	Labels labels.LabelArray `json:"labels,omitempty"`
 
 	// Description is a free form string, it can be used by the creator of
 	// the rule to store human readable explanation of the purpose of this
