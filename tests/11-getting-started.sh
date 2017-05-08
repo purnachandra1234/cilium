@@ -10,6 +10,7 @@ ID_SERVICE1="id.service1"
 ID_SERVICE2="id.service2"
 
 function cleanup {
+  cilium policy delete 2> /dev/null || true
   docker rm -f ${HTTPD_CONTAINER_NAME}  2> /dev/null || true
   docker network rm ${TEST_NET} 2> /dev/null || true
   monitor_stop
@@ -32,18 +33,17 @@ docker run -d --name ${HTTPD_CONTAINER_NAME} --net ${TEST_NET} -l "${ID_SERVICE1
 
 echo "------ creating l3_l4_policy.json ------"
 cat <<EOF | cilium policy import -
-{
-    "name": "root",
-    "rules": [{
-        "coverage": ["${ID_SERVICE1}"],
-        "allow": ["${ID_SERVICE2}"]
-    },{
-        "coverage": ["${ID_SERVICE1}"],
-        "l4": [{
-            "in-ports": [{ "port": 80, "protocol": "tcp" }]
-        }]
+[{
+    "endpointSelector": ["${ID_SERVICE1}"],
+    "ingress": [{
+        "fromEndpoints": [
+	    ["${ID_SERVICE2}"]
+	],
+	"toPorts": [{
+	    "ports": [{"port": 80, "protocol": "tcp"}]
+	}]
     }]
-}
+}]
 EOF
 
 monitor_clear
@@ -71,25 +71,29 @@ docker run --rm -i --net ${TEST_NET} -l "${ID_SERVICE2}" ${DEMO_CONTAINER} curl 
 }
 
 echo "------ creating l7_aware_policy.json ------"
+cilium policy delete
 cat <<EOF | cilium policy import -
-{
-  "name": "root",
-  "rules": [{
-      "coverage": ["${ID_SERVICE1}"],
-      "allow": ["${ID_SERVICE2}", "reserved:host"]
-  },{
-      "coverage": ["${ID_SERVICE2}"],
-      "l4": [{
-          "out-ports": [{
-              "port": 80, "protocol": "tcp",
-              "l7-parser": "http",
-              "l7-rules": [
-                  { "expr": "Method(\"GET\") && Path(\"/public\")" }
-              ]
-          }]
-      }]
-  }]
-} 
+[{
+    "endpointSelector": ["${ID_SERVICE1}"],
+    "ingress": [{
+        "fromEndpoints": [
+	    ["${ID_SERVICE2}", "reserved:host"]
+	]
+    }]
+},{
+    "endpointSelector": ["${ID_SERVICE2}"],
+    "egress": [{
+	"toPorts": [{
+	    "ports": [{"port": 80, "protocol": "tcp"}],
+	    "rules": {
+                "HTTP": [{
+		    "method": "GET",
+		    "path": "/public"
+                }]
+	    }
+	}]
+    }]
+}]
 EOF
 
 monitor_clear
@@ -104,6 +108,5 @@ docker run --rm -i --net ${TEST_NET} -l "${ID_SERVICE2}" ${DEMO_CONTAINER} /bin/
   abort "Error: Unexpected success reaching ${HTTPD_CONTAINER_NAME}/private on port 80"
 }
 
-
-cilium -D policy delete root
+cilium policy delete
 

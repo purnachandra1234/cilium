@@ -59,13 +59,14 @@ sleep 5
 set -x
 
 cat <<EOF | cilium -D policy import -
-{
-        "name": "root",
-	"rules": [{
-		"coverage": ["${SERVER_LABEL}"],
-		"allow": ["reserved:host", "${CLIENT_LABEL}"]
-	}]
-}
+[{
+    "endpointSelector": ["${SERVER_LABEL}"],
+    "ingress": [{
+        "fromEndpoints": [
+	    ["reserved:host"], ["${CLIENT_LABEL}"]
+	]
+    }]
+}]
 EOF
 
 function perf_test() {

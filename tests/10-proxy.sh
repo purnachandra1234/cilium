@@ -3,6 +3,7 @@
 source "./helpers.bash"
 
 function cleanup {
+	cilium policy delete 2> /dev/null || true
 	docker rm -f server client 2> /dev/null || true
 }
 
@@ -36,29 +37,33 @@ set -x
 
 cilium endpoint list
 
+cilium policy delete
 cat <<EOF | cilium -D policy import -
-{
-        "name": "root",
-	"rules": [{
-		"coverage": ["id.client"],
-		"l4": [{
-			"out-ports": [{
-				"port": 80, "protocol": "tcp",
-				"l7-parser": "http",
-				"l7-rules": [{ "expr": "Method(\"GET\")" }]
-			}]
-		}]
-	},{
-		"coverage": ["id.server"],
-		"allow": ["id.client", "reserved:host"]
+[{
+    "endpointSelector": ["id.server"],
+    "ingress": [{
+        "fromEndpoints": [
+	    ["reserved:host"], ["id.client"]
+	]
+    }]
+},{
+    "endpointSelector": ["id.client"],
+    "egress": [{
+	"toPorts": [{
+	    "ports": [{"port": 80, "protocol": "tcp"}],
+	    "rules": {
+                "HTTP": [{
+		    "method": "GET"
+                }]
+	    }
 	}]
-}
+    }]
+}]
 EOF
 
 sleep 2
 
 docker exec -i client bash -c "curl --connect-timeout 10 -XGET http://$SERVER_IP4:80"
-
 docker exec -i client bash -c "curl --connect-timeout 10 -XPUT http://$SERVER_IP4:80"
 
-cilium policy delete root
+cilium policy delete
