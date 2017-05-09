@@ -189,7 +189,7 @@ type PortRule struct {
 	// order for the PortRule to allow the traffic.
 	//
 	// +optional
-	Rules L7Rules `json:"rules,omitempty"`
+	Rules *L7Rules `json:"rules,omitempty"`
 }
 
 // L7Rules is a union of port level rule types. Mixing of different port
