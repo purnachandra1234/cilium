@@ -24,7 +24,9 @@ import (
 	"strings"
 	"time"
 
-	l "github.com/op/go-logging"
+	"github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus/hooks/syslog"
+	"log/syslog"
 )
 
 // goArray2C transforms a byte slice into its hexadecimal string representation.
@@ -70,30 +72,47 @@ func Swab32(n uint32) uint32 {
 }
 
 // SetupLOG sets up logger with the correct parameters for the whole cilium architecture.
-func SetupLOG(logger *l.Logger, logLevel string) {
+func SetupLOG(logger *logrus.Logger, logLevel logrus.Level) {
 
-	var fileFormat l.Formatter
+	fileFormat := new(logrus.TextFormatter)
 	switch os.Getenv("INITSYSTEM") {
 	case "SYSTEMD":
-		fileFormat = l.MustStringFormatter(
-			`%{level:.4s} %{message}`)
+		fileFormat.DisableTimestamp = true
+		//fileFormat.TimestampFormat = "2006-01-02 15:04:05"
+
+		//fileFormat = l.MustStringFormatter(
+		//	`%{level:.4s} %{message}`)
 	default:
-		fileFormat = l.MustStringFormatter(
-			`%{color}%{time:` + time.RFC3339 +
-				`} %{level:.4s} %{color:reset}%{message}`)
-	}
+		fileFormat.TimestampFormat = time.RFC3339
 
-	level, err := l.LogLevel(logLevel)
+		//fileFormat = l.MustStringFormatter(
+		//	`%{color}%{time:` + time.RFC3339 +
+		//		`} %{level:.4s} %{color:reset}%{message}`)
+	}
+	logger.Formatter = fileFormat
+	logger.Level = logLevel
+
+	// Create syslog hook.
+
+	hook, err := logrus_syslog.NewSyslogHook("","", syslog.LOG_INFO, "")
 	if err != nil {
-		logger.Fatal(err)
+		fmt.Println("error initiating syslog hook: %s", err)
+		os.Exit(1)
 	}
+	logger.Hooks.Add(hook)
 
-	backend := l.NewLogBackend(os.Stderr, "", 0)
-	oBF := l.NewBackendFormatter(backend, fileFormat)
+	//level, err := l.LogLevel(logLevel)
+	//if err != nil {
+	//	logger.Fatal(err)
+	//}
 
-	backendLeveled := l.SetBackend(oBF)
-	backendLeveled.SetLevel(level, "")
-	logger.SetBackend(backendLeveled)
+	//backend := l.NewLogBackend(os.Stderr, "", 0)
+
+	//oBF := l.NewBackendFormatter(backend, fileFormat)
+
+	//backendLeveled := l.SetBackend(oBF)
+	//backendLeveled.SetLevel(level, "")
+	//logger.SetBackend(backendLeveled)
 }
 
 // GetGroupIDByName returns the group ID for the given grpName.

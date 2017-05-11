@@ -43,9 +43,9 @@ import (
 	"github.com/go-openapi/loads"
 	consulAPI "github.com/hashicorp/consul/api"
 	flags "github.com/jessevdk/go-flags"
-	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/Sirupsen/logrus"
 )
 
 const (
@@ -60,7 +60,8 @@ const (
 
 var (
 	config = NewConfig()
-	log    = logging.MustGetLogger("cilium")
+	log = logrus.New()
+	//log    = logging.MustGetLogger("cilium")
 
 	// Arguments variables keep in alphabetical order
 	bpfRoot            string
