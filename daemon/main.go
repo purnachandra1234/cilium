@@ -45,7 +45,8 @@ import (
 	flags "github.com/jessevdk/go-flags"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/Sirupsen/logrus"
+	//"github.com/Sirupsen/logrus"
+	logging "github.com/op/go-logging"
 )
 
 const (
@@ -60,8 +61,8 @@ const (
 
 var (
 	config = NewConfig()
-	log = logrus.New()
-	//log    = logging.MustGetLogger("cilium")
+	//log = logrus.New()
+	log    = logging.MustGetLogger("cilium")
 
 	// Arguments variables keep in alphabetical order
 	bpfRoot            string

@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+
 	"github.com/Sirupsen/logrus"
 	"github.com/Sirupsen/logrus/hooks/syslog"
 	"log/syslog"
@@ -72,7 +73,7 @@ func Swab32(n uint32) uint32 {
 }
 
 // SetupLOG sets up logger with the correct parameters for the whole cilium architecture.
-func SetupLOG(logger *logrus.Logger, logLevel logrus.Level) {
+func SetupLOG2(logger *logrus.Logger, logLevel logrus.Level) {
 
 	fileFormat := new(logrus.TextFormatter)
 	switch os.Getenv("INITSYSTEM") {
@@ -113,6 +114,33 @@ func SetupLOG(logger *logrus.Logger, logLevel logrus.Level) {
 	//backendLeveled := l.SetBackend(oBF)
 	//backendLeveled.SetLevel(level, "")
 	//logger.SetBackend(backendLeveled)
+}
+
+// SetupLOG sets up logger with the correct parameters for the whole cilium architecture.
+func SetupLOG(logger *l.Logger, logLevel string) {
+
+	var fileFormat l.Formatter
+	switch os.Getenv("INITSYSTEM") {
+	case "SYSTEMD":
+		fileFormat = l.MustStringFormatter(
+			`%{level:.4s} %{message}`)
+	default:
+		fileFormat = l.MustStringFormatter(
+			`%{color}%{time:` + time.RFC3339 +
+				`} %{level:.4s} %{color:reset}%{message}`)
+	}
+
+	level, err := l.LogLevel(logLevel)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	backend := l.NewLogBackend(os.Stderr, "", 0)
+	oBF := l.NewBackendFormatter(backend, fileFormat)
+
+	backendLeveled := l.SetBackend(oBF)
+	backendLeveled.SetLevel(level, "")
+	logger.SetBackend(backendLeveled)
 }
 
 // GetGroupIDByName returns the group ID for the given grpName.
