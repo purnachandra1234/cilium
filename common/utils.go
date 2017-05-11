@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-
+	l "github.com/op/go-logging"
 	"github.com/Sirupsen/logrus"
 	"github.com/Sirupsen/logrus/hooks/syslog"
 	"log/syslog"
